@@ -42,6 +42,8 @@ import com.nageoffer.ai.ragent.rag.dto.IntentGroup;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import com.nageoffer.ai.ragent.rag.service.RAGChatService;
+import com.nageoffer.ai.ragent.rag.service.attribution.ChatSourceAttributionService;
+import com.nageoffer.ai.ragent.rag.service.handler.SourceAppendingStreamCallback;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamCallbackFactory;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +78,7 @@ public class RAGChatServiceImpl implements RAGChatService {
     private final QueryRewriteService queryRewriteService;
     private final IntentResolver intentResolver;
     private final RetrievalEngine retrievalEngine;
+    private final ChatSourceAttributionService sourceAttributionService;
 
     @Override
     @ChatRateLimit
@@ -119,7 +122,8 @@ public class RAGChatServiceImpl implements RAGChatService {
         }
 
 
-        RetrievalContext ctx = retrievalEngine.retrieve(subIntents, DEFAULT_TOP_K);
+        int finalTopK = DEFAULT_TOP_K;
+        RetrievalContext ctx = retrievalEngine.retrieve(subIntents, finalTopK);
         if (ctx.isEmpty()) {
             String emptyReply = "未检索到与问题相关的文档内容。";
             callback.onContent(emptyReply);
@@ -129,6 +133,11 @@ public class RAGChatServiceImpl implements RAGChatService {
 
         // 聚合所有意图用于 prompt 规划
         IntentGroup mergedGroup = intentResolver.mergeIntentGroup(subIntents);
+        String sourceAppendix = sourceAttributionService.buildDocumentSourceAppendix(
+                ctx.getIntentChunks(),
+                finalTopK
+        );
+        StreamCallback effectiveCallback = new SourceAppendingStreamCallback(callback, sourceAppendix);
 
         StreamCancellationHandle handle = streamLLMResponse(
                 rewriteResult,
@@ -136,7 +145,7 @@ public class RAGChatServiceImpl implements RAGChatService {
                 mergedGroup,
                 history,
                 thinkingEnabled,
-                callback
+                effectiveCallback
         );
         taskManager.bindHandle(taskId, handle);
     }
