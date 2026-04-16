@@ -95,6 +95,7 @@ public class RAGChatServiceImpl implements RAGChatService {
         RewriteResult rewriteResult = queryRewriteService.rewriteWithSplit(question, history);
         List<SubQuestionIntent> subIntents = intentResolver.resolve(rewriteResult);
 
+        //模糊问题，引导用户澄清
         GuidanceDecision guidanceDecision = guidanceService.detectAmbiguity(rewriteResult.rewrittenQuestion(), subIntents);
         if (guidanceDecision.isPrompt()) {
             callback.onContent(guidanceDecision.getPrompt());
@@ -102,6 +103,7 @@ public class RAGChatServiceImpl implements RAGChatService {
             return;
         }
 
+        //闲聊对话，直接让模型生成回复
         boolean allSystemOnly = subIntents.stream()
                 .allMatch(si -> intentResolver.isSystemOnly(si.nodeScores()));
         if (allSystemOnly) {
@@ -115,6 +117,7 @@ public class RAGChatServiceImpl implements RAGChatService {
             taskManager.bindHandle(taskId, handle);
             return;
         }
+
 
         RetrievalContext ctx = retrievalEngine.retrieve(subIntents, DEFAULT_TOP_K);
         if (ctx.isEmpty()) {
