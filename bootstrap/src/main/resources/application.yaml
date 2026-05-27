@@ -5,7 +5,7 @@ server:
 
 spring:
   application:
-    name: ragent-service
+    name: ragent${unique-name:}-service
 
   servlet:
     multipart:
@@ -32,6 +32,12 @@ spring:
       port: 6379
 #      password: 123456
 
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: ragent-producer${unique-name:}_pg
+    send-message-timeout: 2000
+
 milvus:
   uri: http://localhost:19530
 
@@ -41,13 +47,12 @@ rag:
 
   default:
     collection-name: rag_default_store
-    dimension: 1024
+    dimension: 1536
     metric-type: COSINE
+    sse-timeout-ms: 300000  # SSE 全局超时（毫秒），默认 5 分钟
 
   query-rewrite:
     enabled: true
-    max-history-messages: 4
-    max-history-chars: 500
 
   rate-limit:
     global:
@@ -61,9 +66,15 @@ rag:
     history-keep-turns: 4
     summary-start-turns: 5
     summary-enabled: true
-    ttl-minutes: 60
     summary-max-chars: 200
     title-max-length: 30
+
+  semaphore:
+    document-upload:
+      name: rag:document:upload
+      max-concurrent: 10
+      max-wait-seconds: 5
+      lease-seconds: 300
 
   knowledge:
     schedule:
@@ -95,8 +106,8 @@ ai:
     ollama:
       url: http://localhost:11434
       endpoints:
-        chat: /api/chat
-        embedding: /api/embed
+        chat: /v1/chat/completions
+        embedding: /v1/embeddings
     bailian:
       url: https://dashscope.aliyuncs.com
       api-key: sk-c9dae8e83e2d49bca384fc32db1a23cd
@@ -146,12 +157,12 @@ ai:
       - id: qwen-emb-8b
         provider: siliconflow
         model: Qwen/Qwen3-Embedding-8B
-        dimension: 1024
+        dimension: ${rag.default.dimension}
         priority: 1
       - id: qwen-emb-local
         provider: ollama
         model: qwen3-embedding:8b-fp16
-        dimension: 1024
+        dimension: ${rag.default.dimension}
         priority: 2
 
   rerank:

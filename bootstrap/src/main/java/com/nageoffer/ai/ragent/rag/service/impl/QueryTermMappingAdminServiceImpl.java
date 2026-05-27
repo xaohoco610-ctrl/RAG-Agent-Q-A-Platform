@@ -27,7 +27,7 @@ import com.nageoffer.ai.ragent.rag.controller.request.QueryTermMappingCreateRequ
 import com.nageoffer.ai.ragent.rag.controller.request.QueryTermMappingPageRequest;
 import com.nageoffer.ai.ragent.rag.controller.request.QueryTermMappingUpdateRequest;
 import com.nageoffer.ai.ragent.rag.controller.vo.QueryTermMappingVO;
-import com.nageoffer.ai.ragent.rag.core.rewrite.QueryTermMappingService;
+import com.nageoffer.ai.ragent.rag.core.rewrite.QueryTermMappingCacheManager;
 import com.nageoffer.ai.ragent.rag.dao.entity.QueryTermMappingDO;
 import com.nageoffer.ai.ragent.rag.dao.mapper.QueryTermMappingMapper;
 import com.nageoffer.ai.ragent.rag.service.QueryTermMappingAdminService;
@@ -39,7 +39,7 @@ import org.springframework.stereotype.Service;
 public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminService {
 
     private final QueryTermMappingMapper queryTermMappingMapper;
-    private final QueryTermMappingService queryTermMappingService;
+    private final QueryTermMappingCacheManager queryTermMappingCacheManager;
 
     @Override
     public String create(QueryTermMappingCreateRequest requestParam) {
@@ -54,11 +54,11 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
         record.setTargetTerm(targetTerm);
         record.setMatchType(requestParam.getMatchType() != null ? requestParam.getMatchType() : 1);
         record.setPriority(requestParam.getPriority() != null ? requestParam.getPriority() : 0);
-        record.setEnabled(requestParam.getEnabled() != null ? requestParam.getEnabled() : true);
+        record.setEnabled(requestParam.getEnabled() != null ? (requestParam.getEnabled() ? 1 : 0) : 1);
         record.setRemark(StrUtil.trimToNull(requestParam.getRemark()));
 
         queryTermMappingMapper.insert(record);
-        queryTermMappingService.loadMappings();
+        queryTermMappingCacheManager.clearCache();
         return String.valueOf(record.getId());
     }
 
@@ -84,21 +84,21 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
             record.setPriority(requestParam.getPriority());
         }
         if (requestParam.getEnabled() != null) {
-            record.setEnabled(requestParam.getEnabled());
+            record.setEnabled(requestParam.getEnabled() ? 1 : 0);
         }
         if (requestParam.getRemark() != null) {
             record.setRemark(StrUtil.trimToNull(requestParam.getRemark()));
         }
 
         queryTermMappingMapper.updateById(record);
-        queryTermMappingService.loadMappings();
+        queryTermMappingCacheManager.clearCache();
     }
 
     @Override
     public void delete(String id) {
         QueryTermMappingDO record = loadById(id);
         queryTermMappingMapper.deleteById(record.getId());
-        queryTermMappingService.loadMappings();
+        queryTermMappingCacheManager.clearCache();
     }
 
     @Override
@@ -137,7 +137,7 @@ public class QueryTermMappingAdminServiceImpl implements QueryTermMappingAdminSe
                 .targetTerm(record.getTargetTerm())
                 .matchType(record.getMatchType())
                 .priority(record.getPriority())
-                .enabled(record.getEnabled())
+                .enabled(record.getEnabled() != null && record.getEnabled() == 1)
                 .remark(record.getRemark())
                 .createTime(record.getCreateTime())
                 .updateTime(record.getUpdateTime())

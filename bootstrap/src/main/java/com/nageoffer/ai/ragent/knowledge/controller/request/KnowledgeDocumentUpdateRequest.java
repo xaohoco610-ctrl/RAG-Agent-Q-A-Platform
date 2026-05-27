@@ -28,17 +28,37 @@ public class KnowledgeDocumentUpdateRequest {
     private String docName;
 
     /**
-     * 是否启用
+     * 处理模式：chunk / pipeline
      */
-    private Integer enabled;
+    private String processMode;
 
     /**
-     * 状态：pending / running / failed / success
+     * 分块策略（CHUNK 模式），如 fixed_size、structure_aware
      */
-    private String status;
+    private String chunkStrategy;
 
     /**
-     * 分块数（可选：向量化完成后更新）
+     * 分块参数 JSON（CHUNK 模式），如 {"chunkSize":512,"overlapSize":128}
      */
-    private Integer chunkCount;
+    private String chunkConfig;
+
+    /**
+     * Pipeline ID（PIPELINE 模式）
+     */
+    private String pipelineId;
+
+    /**
+     * 来源位置（URL）
+     */
+    private String sourceLocation;
+
+    /**
+     * 是否开启定时拉取：1-启用，0-禁用
+     */
+    private Integer scheduleEnabled;
+
+    /**
+     * 定时表达式（cron）
+     */
+    private String scheduleCron;
 }

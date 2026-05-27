@@ -55,7 +55,7 @@ CREATE TABLE t_conversation_summary (
     id              VARCHAR(20)      NOT NULL PRIMARY KEY,
     conversation_id VARCHAR(20) NOT NULL,
     user_id         VARCHAR(20) NOT NULL,
-    last_message_id VARCHAR(64) NOT NULL,
+    last_message_id VARCHAR(20) NOT NULL,
     content         TEXT        NOT NULL,
     create_time     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -65,14 +65,16 @@ CREATE INDEX idx_conv_user ON t_conversation_summary (conversation_id, user_id);
 COMMENT ON TABLE t_conversation_summary IS '会话摘要表（与消息表分离存储）';
 
 CREATE TABLE t_message (
-    id              VARCHAR(20)      NOT NULL PRIMARY KEY,
-    conversation_id VARCHAR(20) NOT NULL,
-    user_id         VARCHAR(20) NOT NULL,
-    role            VARCHAR(32) NOT NULL,
-    content         TEXT        NOT NULL,
-    create_time     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    update_time     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted         SMALLINT    DEFAULT 0
+    id                VARCHAR(20)      NOT NULL PRIMARY KEY,
+    conversation_id   VARCHAR(20) NOT NULL,
+    user_id           VARCHAR(20) NOT NULL,
+    role              VARCHAR(16) NOT NULL,
+    content           TEXT        NOT NULL,
+    thinking_content  TEXT,
+    thinking_duration INTEGER,
+    create_time       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted           SMALLINT    DEFAULT 0
 );
 CREATE INDEX idx_conversation_user_time ON t_message (conversation_id, user_id, create_time);
 CREATE INDEX idx_conversation_summary ON t_message (conversation_id, user_id, create_time);
@@ -99,7 +101,7 @@ CREATE TABLE t_sample_question (
     id          VARCHAR(20)        NOT NULL PRIMARY KEY,
     title       VARCHAR(64),
     description VARCHAR(255),
-    question    VARCHAR(1024) NOT NULL,
+    question    VARCHAR(255) NOT NULL,
     create_time TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
     deleted     SMALLINT      DEFAULT 0
@@ -114,8 +116,8 @@ COMMENT ON TABLE t_sample_question IS '示例问题表';
 CREATE TABLE t_knowledge_base (
     id              VARCHAR(20)       NOT NULL PRIMARY KEY,
     name            VARCHAR(128) NOT NULL,
-    embedding_model VARCHAR(128) NOT NULL,
-    collection_name VARCHAR(128) NOT NULL,
+    embedding_model VARCHAR(64)  NOT NULL,
+    collection_name VARCHAR(64) NOT NULL,
     created_by      VARCHAR(20)  NOT NULL,
     updated_by      VARCHAR(20),
     create_time     TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -133,14 +135,14 @@ CREATE TABLE t_knowledge_document (
     enabled          SMALLINT      NOT NULL DEFAULT 1,
     chunk_count      INTEGER       DEFAULT 0,
     file_url         VARCHAR(1024) NOT NULL,
-    file_type        VARCHAR(32)   NOT NULL,
+    file_type        VARCHAR(16)   NOT NULL,
     file_size        BIGINT,
-    process_mode     VARCHAR(32)   DEFAULT 'chunk',
-    status           VARCHAR(32)   NOT NULL DEFAULT 'pending',
-    source_type      VARCHAR(32),
+    process_mode     VARCHAR(16)   DEFAULT 'chunk',
+    status           VARCHAR(16)   NOT NULL DEFAULT 'pending',
+    source_type      VARCHAR(16),
     source_location  VARCHAR(1024),
     schedule_enabled SMALLINT,
-    schedule_cron    VARCHAR(128),
+    schedule_cron    VARCHAR(64),
     chunk_strategy   VARCHAR(32),
     chunk_config     JSONB,
     pipeline_id      VARCHAR(20),
@@ -175,13 +177,14 @@ COMMENT ON TABLE t_knowledge_chunk IS '知识库文档分块表';
 CREATE TABLE t_knowledge_document_chunk_log (
     id                 VARCHAR(20)      NOT NULL PRIMARY KEY,
     doc_id             VARCHAR(20)      NOT NULL,
-    status             VARCHAR(20) NOT NULL,
-    process_mode       VARCHAR(20),
-    chunk_strategy     VARCHAR(50),
+    status             VARCHAR(16)      NOT NULL,
+    process_mode       VARCHAR(16),
+    chunk_strategy     VARCHAR(16),
     pipeline_id        VARCHAR(20),
     extract_duration   BIGINT,
     chunk_duration     BIGINT,
-    embedding_duration BIGINT,
+    embed_duration     BIGINT,
+    persist_duration   BIGINT,
     total_duration     BIGINT,
     chunk_count        INTEGER,
     error_message      TEXT,
@@ -197,12 +200,12 @@ CREATE TABLE t_knowledge_document_schedule (
     id                VARCHAR(20)       NOT NULL PRIMARY KEY,
     doc_id            VARCHAR(20)       NOT NULL,
     kb_id             VARCHAR(20)       NOT NULL,
-    cron_expr         VARCHAR(128),
+    cron_expr         VARCHAR(64),
     enabled           SMALLINT     DEFAULT 0,
     next_run_time     TIMESTAMP,
     last_run_time     TIMESTAMP,
     last_success_time TIMESTAMP,
-    last_status       VARCHAR(32),
+    last_status       VARCHAR(16),
     last_error        VARCHAR(512),
     last_etag         VARCHAR(256),
     last_modified     VARCHAR(256),
@@ -222,7 +225,7 @@ CREATE TABLE t_knowledge_document_schedule_exec (
     schedule_id   VARCHAR(20)       NOT NULL,
     doc_id        VARCHAR(20)       NOT NULL,
     kb_id         VARCHAR(20)       NOT NULL,
-    status        VARCHAR(32)  NOT NULL,
+    status        VARCHAR(16)  NOT NULL,
     message       VARCHAR(512),
     start_time    TIMESTAMP,
     end_time      TIMESTAMP,
@@ -316,7 +319,7 @@ CREATE TABLE t_rag_trace_node (
     node_id        VARCHAR(20)      NOT NULL,
     parent_node_id VARCHAR(20),
     depth          INTEGER          DEFAULT 0,
-    node_type      VARCHAR(64),
+    node_type      VARCHAR(16),
     node_name      VARCHAR(128),
     class_name     VARCHAR(256),
     method_name    VARCHAR(128),
@@ -354,7 +357,7 @@ CREATE TABLE t_ingestion_pipeline_node (
     id             VARCHAR(20)      NOT NULL PRIMARY KEY,
     pipeline_id    VARCHAR(20)      NOT NULL,
     node_id        VARCHAR(20) NOT NULL,
-    node_type      VARCHAR(30) NOT NULL,
+    node_type      VARCHAR(16) NOT NULL,
     next_node_id   VARCHAR(20),
     settings_json  JSONB,
     condition_json JSONB,
@@ -374,7 +377,7 @@ CREATE TABLE t_ingestion_task (
     source_type      VARCHAR(20) NOT NULL,
     source_location  TEXT,
     source_file_name VARCHAR(255),
-    status           VARCHAR(20) NOT NULL,
+    status           VARCHAR(16) NOT NULL,
     chunk_count      INTEGER     DEFAULT 0,
     error_message    TEXT,
     logs_json        JSONB,
@@ -396,9 +399,9 @@ CREATE TABLE t_ingestion_task_node (
     task_id       VARCHAR(20)      NOT NULL,
     pipeline_id   VARCHAR(20)      NOT NULL,
     node_id       VARCHAR(20) NOT NULL,
-    node_type     VARCHAR(30) NOT NULL,
+    node_type     VARCHAR(16) NOT NULL,
     node_order    INTEGER     NOT NULL DEFAULT 0,
-    status        VARCHAR(20) NOT NULL,
+    status        VARCHAR(16) NOT NULL,
     duration_ms   BIGINT      NOT NULL DEFAULT 0,
     message       TEXT,
     error_message TEXT,
@@ -420,7 +423,7 @@ CREATE TABLE t_knowledge_vector (
     id          VARCHAR(20) PRIMARY KEY,
     content     TEXT,
     metadata    JSONB,
-    embedding   vector(1024)
+    embedding   vector(1536)
 );
 
 CREATE INDEX idx_kv_metadata ON t_knowledge_vector USING gin(metadata);
@@ -451,6 +454,8 @@ COMMENT ON COLUMN t_message.conversation_id IS '会话ID';
 COMMENT ON COLUMN t_message.user_id IS '用户ID';
 COMMENT ON COLUMN t_message.role IS '角色：user/assistant';
 COMMENT ON COLUMN t_message.content IS '消息内容';
+COMMENT ON COLUMN t_message.thinking_content IS '深度思考内容';
+COMMENT ON COLUMN t_message.thinking_duration IS '深度思考耗时（秒）';
 COMMENT ON COLUMN t_message.create_time IS '创建时间';
 COMMENT ON COLUMN t_message.update_time IS '更新时间';
 COMMENT ON COLUMN t_message.deleted IS '是否删除 0：正常 1：删除';
@@ -536,7 +541,8 @@ COMMENT ON COLUMN t_knowledge_document_chunk_log.chunk_strategy IS '分块策略
 COMMENT ON COLUMN t_knowledge_document_chunk_log.pipeline_id IS 'Pipeline ID';
 COMMENT ON COLUMN t_knowledge_document_chunk_log.extract_duration IS '提取耗时（毫秒）';
 COMMENT ON COLUMN t_knowledge_document_chunk_log.chunk_duration IS '分块耗时（毫秒）';
-COMMENT ON COLUMN t_knowledge_document_chunk_log.embedding_duration IS '向量化耗时（毫秒）';
+COMMENT ON COLUMN t_knowledge_document_chunk_log.embed_duration IS '向量化耗时（毫秒）';
+COMMENT ON COLUMN t_knowledge_document_chunk_log.persist_duration IS 'DB持久化耗时（毫秒）';
 COMMENT ON COLUMN t_knowledge_document_chunk_log.total_duration IS '总耗时（毫秒）';
 COMMENT ON COLUMN t_knowledge_document_chunk_log.chunk_count IS '分块数量';
 COMMENT ON COLUMN t_knowledge_document_chunk_log.error_message IS '错误信息';

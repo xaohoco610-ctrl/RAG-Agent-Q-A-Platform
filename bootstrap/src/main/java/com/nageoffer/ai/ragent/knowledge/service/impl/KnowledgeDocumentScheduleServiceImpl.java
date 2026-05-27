@@ -17,10 +17,13 @@
 
 package com.nageoffer.ai.ragent.knowledge.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentScheduleDO;
+import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentScheduleExecDO;
+import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentScheduleExecMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentScheduleMapper;
 import com.nageoffer.ai.ragent.knowledge.enums.SourceType;
 import com.nageoffer.ai.ragent.knowledge.schedule.CronScheduleHelper;
@@ -29,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Date;
@@ -39,6 +43,7 @@ import java.util.Date;
 public class KnowledgeDocumentScheduleServiceImpl implements KnowledgeDocumentScheduleService {
 
     private final KnowledgeDocumentScheduleMapper scheduleMapper;
+    private final KnowledgeDocumentScheduleExecMapper scheduleExecMapper;
     @Value("${rag.knowledge.schedule.min-interval-seconds:60}")
     private long scheduleMinIntervalSeconds;
 
@@ -103,10 +108,25 @@ public class KnowledgeDocumentScheduleServiceImpl implements KnowledgeDocumentSc
                     .build();
             scheduleMapper.insert(schedule);
         } else {
-            existing.setCronExpr(cron);
-            existing.setEnabled(enabled ? 1 : 0);
-            existing.setNextRunTime(nextRunTime);
-            scheduleMapper.updateById(existing);
+            scheduleMapper.update(
+                    new LambdaUpdateWrapper<KnowledgeDocumentScheduleDO>()
+                            .eq(KnowledgeDocumentScheduleDO::getId, existing.getId())
+                            .set(KnowledgeDocumentScheduleDO::getCronExpr, cron)
+                            .set(KnowledgeDocumentScheduleDO::getEnabled, enabled ? 1 : 0)
+                            .set(KnowledgeDocumentScheduleDO::getNextRunTime, nextRunTime)
+            );
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteByDocId(String docId) {
+        if (!StringUtils.hasText(docId)) {
+            return;
+        }
+        scheduleExecMapper.delete(new LambdaQueryWrapper<KnowledgeDocumentScheduleExecDO>()
+                .eq(KnowledgeDocumentScheduleExecDO::getDocId, docId));
+        scheduleMapper.delete(new LambdaQueryWrapper<KnowledgeDocumentScheduleDO>()
+                .eq(KnowledgeDocumentScheduleDO::getDocId, docId));
     }
 }
